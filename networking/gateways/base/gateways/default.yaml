@@ -83,6 +83,54 @@ spec:
         certificateRefs:
           - name: harbor-okwilkins-dev-tls
             namespace: harbor
+    - protocol: HTTPS
+      name: home-lan-search
+      hostname: search.okwilkins.dev
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: search-okwilkins-dev-tls
+            namespace: searxng
+    - protocol: HTTPS
+      name: home-lan-hubble
+      hostname: hubble.okwilkins.dev
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: hubble-okwilkins-dev-tls
+            namespace: kube-system
+    - protocol: HTTPS
+      name: home-lan-authelia
+      hostname: auth.okwilkins.dev
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: auth-okwilkins-dev-tls
+            namespace: authelia
+    - protocol: HTTPS
+      name: home-lan-mazanoke
+      hostname: convert.okwilkins.dev
+      port: 443
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: convert-okwilkins-dev-tls
+            namespace: mazanoke
     - protocol: TLS
       name: home-lan-pg-tf-backend
       hostname: pg-tf-backend.okwilkins.dev
@@ -92,7 +140,7 @@ spec:
           from: All
       tls:
         mode: Passthrough
-      #   mode: Terminate
-      #   certificateRefs:
-      #     - name: pg-tf-backend-okwilkins-dev-tls
-      #       namespace: terraform
+        #   mode: Terminate
+        #   certificateRefs:
+        #     - name: pg-tf-backend-okwilkins-dev-tls
+        #       namespace: terraform

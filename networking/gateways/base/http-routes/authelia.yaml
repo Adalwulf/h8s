@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: authelia
+  namespace: authelia
+spec:
+  parentRefs:
+    - name: default-gateway
+      namespace: default
+    - name: cloudflare-gateway
+      namespace: cloudflare
+  hostnames:
+    - auth.okwilkins.dev
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Forwarded-Proto
+                value: https
+              - name: X-Forwarded-Host
+                value: auth.okwilkins.dev
+      backendRefs:
+        - name: authelia
+          port: 80

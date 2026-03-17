@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: searxng
+  namespace: searxng
+spec:
+  parentRefs:
+    - name: default-gateway
+      namespace: default
+    - name: cloudflare-gateway
+      namespace: cloudflare
+  hostnames:
+    - search.okwilkins.dev
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            set:
+              - name: X-Forwarded-Proto
+                value: https
+              - name: X-Forwarded-Host
+                value: search.okwilkins.dev
+      backendRefs:
+        - name: searxng
+          port: 8080

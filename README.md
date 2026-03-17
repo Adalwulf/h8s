@@ -1,5 +1,7 @@
 # H8s (Homernetes)
 
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.35-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io) [![Talos Linux](https://img.shields.io/badge/Talos-v1.12.0-00A3E0?style=for-the-badge&logo=linux&logoColor=white)](https://www.talos.dev) [![Cilium](https://img.shields.io/badge/Cilium-1.19.1-F8C517?style=for-the-badge&logo=cilium&logoColor=black)](https://cilium.io) [![ArgoCD](https://img.shields.io/badge/ArgoCD-9.4.7-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)](https://argoproj.github.io/cd) [![Nix Flakes](https://img.shields.io/badge/Nix-Flakes-5277C3?style=for-the-badge&logo=nixos&logoColor=white)](https://nixos.org) [![Stars](https://img.shields.io/github/stars/okwilkins/h8s?style=for-the-badge&logo=github&color=brightgreen)](https://github.com/okwilkins/h8s/stargazers)
+
 H8s is a home infrastructure project that combines the power of Kubernetes with the security-first approach of Talos OS.
 This project provides a my setup, designed specifically for home labs and personal cloud environments.
 
@@ -16,6 +18,7 @@ Doing a homelab Kubernetes cluster has been a source of a lot of joy for me pers
 Most importantly: ***I find it fun!*** It keeps me excited and hungry at work and on my other personal projects.
 
 ## Features
+- Automated Bootstrap - 8-stage fully declaritive pipeline for complete cluster provisioning from bare metal in under 10 mins.
 - Container registry.
 - Home-wide ad blocker and DNS.
 - Internal certificate authority.
@@ -34,17 +37,17 @@ Most importantly: ***I find it fun!*** It keeps me excited and hungry at work an
 
 ```text
 ├── applications
-│   └── excalidraw                  | Self-hosted Excalidraw.
+│   ├── excalidraw                  | Self-hosted Excalidraw.
+│   └── searxng                     | Privacy-focused metasearch engine.
 ├── ci-cd
 │   ├── argo-workflows              | CI/CD pipelines (WIP).
-│   └── argocd                      | GitOps CD for Kubernetes resources.
+│   ├── argocd                      | GitOps CD for Kubernetes resources.
+│   └── renovate                    | Automated dependency updates.
 ├── images
 │   ├── coredns
 │   ├── terraform
 │   └── image-buildah
-├── infrastructure
-│   ├── talos                       | Scripts and definintions for Talos running on Proxmox.
-│   └── terraform                   | Terraform for internal infrastructure.
+├── infrastructure                  | Complete bootstrapping of the cluster with Proxmox and Talos + platform configuration.
 ├── namespaces                      | Holds all namespaces for the cluster.
 ├── networking
 │   ├── cert-manager                | Certificate controller for the self-hosted certificate authority.
@@ -56,13 +59,13 @@ Most importantly: ***I find it fun!*** It keeps me excited and hungry at work an
 │   ├── grafana                     | Metrics and log observability.
 │   ├── loki                        | Log collection.
 │   ├── prometheus                  | Metrics collection.
-│   └── promtail                    | Log transport agent. 
+│   └── promtail                    | Log collection and shipping agent.
 ├── security
 │   ├── cosign                      | Secrets to sign containers and binaries going to Harbor.
 │   ├── external-secrets-operator   | Takes secrets hosted internally with Vault and manages them inside the cluster.
-│   ├── keycloak                    | (WIP) Cluster SSO.
-│   └── vault                       | Secrets storage and certificate authority. 
-├── storage
+|   ├── pocket-id                   | Simple OIDC provider that allows users to authenticate with passkeys.
+│   └── vault                       | Secrets storage and certificate authority.
+└── storage
     ├── cloudnative-pg              | PostrgreSQL database management for various Applications.
     ├── harbor                      | Container and binary registry.
     └── longhorn                    | Cluster CSI.

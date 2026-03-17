@@ -1,0 +1,205 @@
+version: "3"
+run: once
+
+vars:
+  STATES_DIR: "$INFRA_ROOT/states"
+
+tasks:
+  default:
+    desc: "List all available tasks"
+    cmds:
+      - task --list
+
+  # Talos Factory
+  talos:factory:install:
+    desc: "Generate Talos schematic with custom extensions"
+    dir: '$INFRA_ROOT/00-talos-factory'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  talos:factory:destroy:
+    desc: "Destroy Talos factory schematic"
+    dir: '$INFRA_ROOT/00-talos-factory'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Proxmox ISO - Download Talos ISO to Proxmox nodes
+  proxmox:iso:install:
+    desc: "Download Talos ISO to Proxmox nodes"
+    dir: '$INFRA_ROOT/01-proxmox-iso-upload'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  proxmox:iso:destroy:
+    desc: "Remove Talos ISO from Proxmox nodes"
+    dir: '$INFRA_ROOT/01-proxmox-iso-upload'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Proxmox Provision - Create VMs on Proxmox
+  proxmox:provision:install:
+    desc: "Create VMs on Proxmox"
+    dir: '$INFRA_ROOT/02-proxmox-provision'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  proxmox:provision:destroy:
+    desc: "Destroy Proxmox VMs"
+    dir: '$INFRA_ROOT/02-proxmox-provision'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Talos Configure - Configure nodes, bootstrap etcd, retrieve kubeconfig
+  talos:configure:install:
+    desc: "Configure Talos nodes, bootstrap etcd, retrieve kubeconfig"
+    dir: '$INFRA_ROOT/03-talos-configure'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  talos:configure:destroy:
+    desc: "Destroy Talos configuration and nodes"
+    dir: '$INFRA_ROOT/03-talos-configure'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Cilium - Install Cilium CNI
+  cilium:install:
+    desc: "Install Cilium CNI"
+    dir: '$INFRA_ROOT/04-cilium'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  cilium:destroy:
+    desc: "Destroy Cilium CNI installation"
+    dir: '$INFRA_ROOT/04-cilium'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # ArgoCD - Install ArgoCD for GitOps
+  argocd:install:
+    desc: "Install ArgoCD for GitOps"
+    dir: '$INFRA_ROOT/05-argocd'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  argocd:destroy:
+    desc: "Destroy ArgoCD installation"
+    dir: '$INFRA_ROOT/05-argocd'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Vault Init - Initialise Vault outputs for helper scripts
+  vault:init:
+    desc: "Initialise Vault (create outputs and run bootstrap)"
+    dir: '$INFRA_ROOT/06-vault-init'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  vault:destroy:
+    desc: "Destroy Vault outputs"
+    dir: '$INFRA_ROOT/06-vault-init'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Vault Secrets - Provision secrets in Vault
+  vault:secrets:install:
+    desc: "Provision all secrets in Vault (passwords, keys, external secrets)"
+    dir: '$INFRA_ROOT/07-vault-resources-provision'
+    cmds:
+      - tofu init
+      - tofu apply -auto-approve
+
+  vault:secrets:destroy:
+    desc: "Destroy Vault secrets (secrets remain in Vault, only Terraform state removed)"
+    dir: '$INFRA_ROOT/07-vault-resources-provision'
+    cmds:
+      - tofu destroy -auto-approve
+
+  # Platform Configuration - Configure Harbor and other platform resources
+  platform:configure:
+    desc: "Configure Harbor registry and platform resources (run after cluster:bootstrap)"
+    dir: '$INFRA_ROOT/platform-config'
+    cmds:
+      - |
+        # Start port-forward in background and save PID
+        kubectl -n terraform port-forward svc/cnpg-terraform-backend-prod-rw 5432:5432 &
+        echo $! > /tmp/platform-config-pf.pid
+
+        # Verify port-forward is working
+        if ! nc -z localhost 5432 2>/dev/null; then
+          echo "Error: Port-forward not established. Waiting a bit longer..."
+          sleep 5
+          if ! nc -z localhost 5432 2>/dev/null; then
+            echo "Error: Could not establish port-forward to Postgres"
+            exit 1
+          fi
+        fi
+
+        echo "Port-forward established successfully"
+      - defer: |
+          if [ -f /tmp/platform-config-pf.pid ]; then
+            PF_PID=$(cat /tmp/platform-config-pf.pid)
+            echo "Cleaning up port-forward (PID: $PF_PID)..."
+            kill $PF_PID 2>/dev/null || true
+            wait $PF_PID 2>/dev/null || true
+            rm -f /tmp/platform-config-pf.pid
+          fi
+      - |
+        # Extract credentials from Kubernetes secrets
+        echo "Extracting database credentials..."
+        export PGUSER=$(kubectl get secret cnpg-terraform-backend-prod-app-user-credentials -n terraform -o jsonpath='{.data.username}' | base64 -d)
+        export PGPASSWORD=$(kubectl get secret cnpg-terraform-backend-prod-app-user-credentials -n terraform -o jsonpath='{.data.password}' | base64 -d)
+        export PGHOST=localhost
+        export PGPORT=5432
+        export PGDATABASE=terraform_backend
+
+        if [ -z "$PGUSER" ] || [ -z "$PGPASSWORD" ]; then
+          echo "Error: Could not extract database credentials from secrets"
+          exit 1
+        fi
+
+        echo "Running Terraform..."
+        terraform init
+        terraform apply -auto-approve
+
+        echo "Platform configuration complete!"
+
+  # Composite tasks
+  cluster:bootstrap:
+    desc: "Run all bootstrap stages in sequence (stages 1-8). Run 'task platform:configure' afterwards for Step 9."
+    cmds:
+      - task: talos:factory:install
+      - task: proxmox:iso:install
+      - task: proxmox:provision:install
+      - task: talos:configure:install
+      - task: cilium:install
+      - task: argocd:install
+      - task: vault:init
+      - task: vault:secrets:install
+
+  cluster:destroy:
+    desc: "Destroy all resources in reverse order"
+    cmds:
+      - task: proxmox:provision:destroy
+      - task: proxmox:iso:destroy
+      - task: talos:factory:destroy
+
+  # Utility tasks
+  clean:states:
+    desc: "Remove all Terraform state files (DANGEROUS - destroys all state!)"
+    cmds:
+      - rm -rf {{.STATES_DIR}}
+      - echo "State files removed. You will need to re-run cluster:bootstrap to recreate the cluster."
+
+  clean:all:
+    desc: "Destroy all resources and remove state files (COMPLETE RESET)"
+    cmds:
+      - task: cluster:destroy
+      - task: clean:states

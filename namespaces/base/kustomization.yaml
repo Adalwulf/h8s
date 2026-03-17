@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ./argo-workflows-namespace.yaml
+  - ./authelia-namespace.yaml
   - ./cert-manager-namespace.yaml
   - ./cloudflare-namespace.yaml
   - ./cpng-system-namespace.yaml
@@ -12,6 +13,10 @@ resources:
   - ./harbor-namespace.yaml
   - ./keycloak-namespace.yaml
   - ./longhorn-system-namespace.yaml
+  - ./mazanoke-namespace.yaml
   - ./monitoring-namespace.yaml
+  - ./pocket-id-namespace.yaml
+  - ./renovate-namespace.yaml
   - ./vault-namespace.yaml
+  - ./searxng-namespace.yaml
   - ./terraform-namespace.yaml
