@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: https://charts.authelia.com
       chart: authelia
-      targetRevision: 0.10.58
+      targetRevision: 0.11.22
       helm:
         valueFiles:
           - $h8s/security/authelia/environments/prod/values.yaml
@@ -23,6 +23,11 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: authelia
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
   syncPolicy:
     automated:
       prune: true

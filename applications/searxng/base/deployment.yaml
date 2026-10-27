@@ -18,12 +18,20 @@ spec:
       imagePullSecrets:
         - name: harbor-credentials
       securityContext:
+        runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 3000
         fsGroup: 3000
+        seccompProfile:
+          type: RuntimeDefault
       initContainers:
         - name: init-config
-          image: harbor.okwilkins.dev/docker-hub-cache/busybox:1.37.0
+          image: harbor.okwilkins.dev/docker-hub-cache/busybox:1.38.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           command:
             - "sh"
             - "-c"
@@ -35,7 +43,7 @@ spec:
               mountPath: /etc/searxng
       containers:
         - name: searxng
-          image: harbor.okwilkins.dev/docker-hub-cache/searxng/searxng:2026.3.1-162c04a1c
+          image: harbor.okwilkins.dev/docker-hub-cache/searxng/searxng:2026.10.19-d47cb96bf
           ports:
             - name: http
               containerPort: 8080
@@ -81,6 +89,59 @@ spec:
               memory: 512Mi
             limits:
               memory: 1Gi
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: proxy
+              containerPort: 4180
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: searxng-oidc-secret
+                  key: client-secret-plaintext
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-cookie-secret
+                  key: cookie-secret
+          volumeMounts:
+            - name: oidc-provider-ca
+              mountPath: /etc/ssl/certs/oidc-provider
+              readOnly: true
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=https://auth.okwilkins.dev
+            - --provider-ca-file=/etc/ssl/certs/oidc-provider/ca.crt
+            - --client-id=searxng
+            - --scope=openid profile email groups
+            - --code-challenge-method=S256
+            - --upstream=http://localhost:8080
+            - --http-address=0.0.0.0:4180
+            - --email-domain=*
+            - --redirect-url=https://search.okwilkins.dev/oauth2/callback
+            - --cookie-domain=.okwilkins.dev
+            - --set-xauthrequest=true
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
       volumes:
         - name: config-source
           configMap:
@@ -95,3 +156,9 @@ spec:
             claimName: searxng-cache-pvc
         - name: tmp
           emptyDir: {}
+        - name: oidc-provider-ca
+          secret:
+            secretName: search-okwilkins-dev-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

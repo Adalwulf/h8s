@@ -1,16 +1,20 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  # Gateway API CRDs v1.2.0
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/standard/gateway.networking.k8s.io_grpcroutes.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/experimental/gateway.networking.k8s.io_tlsroutes.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/experimental/gateway.networking.k8s.io_tcproutes.yaml
-  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.2.0/config/crd/experimental/gateway.networking.k8s.io_udproutes.yaml
+  # Gateway API CRDs v1.6.1
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_gateways.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_grpcroutes.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_backendtlspolicies.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_tlsroutes.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_listenersets.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_tcproutes.yaml
+  - https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/refs/tags/v1.6.3/config/crd/standard/gateway.networking.k8s.io_udproutes.yaml
   # Gateways and routes
+  - ./gateways/gateway-access-logs.yaml
+  - ./gateways/cilium-default-class.yaml
   - ./gateways/default.yaml
   - ./gateways/cloudflare.yaml
   - ./http-routes/grafana.yaml
@@ -23,6 +27,7 @@ resources:
   - ./http-routes/mazanoke.yaml
   - ./http-routes/hubble-ui.yaml
   - ./http-routes/authelia.yaml
+  - ./http-routes/chhoto-url.yaml
   - ./tls-routes/pg-tf-backend.yaml
   # Reference grants
   - ./reference-grants/default-gateway-argocd-tls.yaml
@@ -36,3 +41,4 @@ resources:
   - ./reference-grants/default-gateway-hubble-tls.yaml
   - ./reference-grants/default-gateway-mazanoke-tls.yaml
   - ./reference-grants/default-gateway-authelia-tls.yaml
+  - ./reference-grants/default-gateway-chhoto-url-tls.yaml

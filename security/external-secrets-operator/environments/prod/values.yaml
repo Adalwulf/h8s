@@ -3,3 +3,6 @@
 namespaceOverride: external-secrets
 serviceMonitor:
   enabled: true
+grafanaDashboard:
+  namespace: monitoring
+  enabled: true

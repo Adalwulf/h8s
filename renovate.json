@@ -27,6 +27,9 @@
     "nix": {
         "enabled": true
     },
+    "lockFileMaintenance": {
+        "enabled": true
+    },
     "customManagers": [
         {
             "customType": "regex",
@@ -35,7 +38,7 @@
                 "/.*/kustomization\\.yaml$/"
             ],
             "matchStrings": [
-                "-\\s+https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?<currentValue>[^/]+)/.*"
+                "-\\s+https://raw\\.githubusercontent\\.com/(?<depName>[^/]+/[^/]+)/(?:refs/tags/)?(?<currentValue>v?\\d[^/]*)/.*"
             ],
             "datasourceTemplate": "github-tags",
             "versioningTemplate": "semver"
@@ -47,10 +50,64 @@
                 "/storage/cloudnative-pg/.*\\.yaml$/"
             ],
             "matchStrings": [
-                "imageName:\\s+(?<depName>[^\\s]+):(?<currentValue>[^\\s]+)"
+                "imageName:\\s+(?<depName>[^\\s:]+):(?<currentValue>[^\\s@]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?"
             ],
             "datasourceTemplate": "docker",
-            "versioningTemplate": "loose"
+            "versioningTemplate": "docker"
+        },
+        {
+            "customType": "regex",
+            "description": "Update the Talos-managed CoreDNS image",
+            "managerFilePatterns": [
+                "/^infrastructure/03-talos-configure/main\\.tf$/"
+            ],
+            "matchStrings": [
+                "image\\s*=\\s*\"(?<depName>docker\\.io/coredns/coredns):(?<currentValue>[^\\s\"@]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
+            ],
+            "datasourceTemplate": "docker",
+            "versioningTemplate": "docker"
+        },
+        {
+            "customType": "regex",
+            "description": "Update stable nixpkgs channels in the Buildah image",
+            "managerFilePatterns": [
+                "/^images/image-buildah/flake\\.nix$/"
+            ],
+            "matchStrings": [
+                "nixpkgs\\.url\\s*=\\s*\"github:NixOS/nixpkgs/(?<currentValue>nixos-\\d{2}\\.\\d{2})\""
+            ],
+            "depNameTemplate": "nixpkgs",
+            "packageNameTemplate": "https://github.com/NixOS/nixpkgs",
+            "datasourceTemplate": "git-refs",
+            "versioningTemplate": "nixpkgs"
+        },
+        {
+            "customType": "regex",
+            "description": "Update the Grafana operand version",
+            "managerFilePatterns": [
+                "/^observability/grafana/environments/prod/grafana\\.yaml$/"
+            ],
+            "matchStrings": [
+                "(?:^|\\r?\\n)  version:\\s*[\"']?(?<currentValue>[^\\s\"']+)"
+            ],
+            "depNameTemplate": "docker.io/grafana/grafana",
+            "datasourceTemplate": "docker",
+            "versioningTemplate": "docker"
+        },
+        {
+            "customType": "regex",
+            "description": "Update the VictoriaLogs Grafana plugin",
+            "managerFilePatterns": [
+                "/^observability/grafana/environments/prod/datasources/victorialogs-default\\.yaml$/"
+            ],
+            "matchStrings": [
+                "- name:\\s+victoriametrics-logs-datasource\\s+version:\\s*[\"']?(?<currentValue>[^\\s\"']+)"
+            ],
+            "depNameTemplate": "victoriametrics-logs-datasource",
+            "packageNameTemplate": "VictoriaMetrics/victorialogs-datasource",
+            "datasourceTemplate": "github-releases",
+            "extractVersionTemplate": "^v(?<version>.*)$",
+            "versioningTemplate": "semver"
         }
     ],
     "packageRules": [
@@ -65,52 +122,107 @@
             ]
         },
         {
-            "description": "CloudNativePG images from ghcr.io",
+            "description": "Keep PostgreSQL images minimal with digest pins; review Debian migrations separately",
             "matchDatasources": [
                 "docker"
             ],
             "matchPackageNames": [
-                "ghcr.io/cloudnative-pg/**"
+                "ghcr.io/cloudnative-pg/postgresql"
             ],
-            "enabled": true
+            "allowedVersions": "/^[0-9]+\\.[0-9]+-minimal-[a-z]+$/",
+            "pinDigests": true
         },
         {
-            "description": "Force docker datasource for OCI Helm charts (ghcr.io)",
+            "description": "Retain digest pins for the Talos-managed CoreDNS image",
             "matchDatasources": [
                 "docker"
             ],
             "matchPackageNames": [
-                "ghcr.io/grafana/helm-charts/grafana-operator"
+                "docker.io/coredns/coredns"
             ],
-            "enabled": true
+            "pinDigests": true
         },
         {
-            "description": "Resolve images via Harbor docker-hub-cache proxy against Docker Hub",
+            "description": "Require approval before proposing PostgreSQL major upgrades",
             "matchDatasources": [
                 "docker"
             ],
             "matchPackageNames": [
-                "harbor.okwilkins.dev/docker-hub-cache/**"
+                "ghcr.io/cloudnative-pg/postgresql"
             ],
-            "registryUrls": [
-                "https://index.docker.io"
+            "matchUpdateTypes": [
+                "major"
             ],
-            "overrideDepName": "{{replace 'harbor\\.okwilkins\\.dev/docker-hub-cache/' '' depName}}",
-            "enabled": true
+            "dependencyDashboardApproval": true
         },
         {
-            "description": "Resolve images via Harbor ghcr-cache proxy against GHCR",
+            "description": "Use regex channel updates while retaining native Nix lock maintenance",
+            "matchManagers": [
+                "nix"
+            ],
+            "matchFileNames": [
+                "images/image-buildah/flake.nix"
+            ],
+            "matchPackageNames": [
+                "https://github.com/NixOS/nixpkgs"
+            ],
+            "matchUpdateTypes": [
+                "major",
+                "minor",
+                "patch"
+            ],
+            "enabled": false
+        },
+        {
+            "description": "Refresh the Buildah flake lock after a stable channel update",
+            "matchManagers": [
+                "custom.regex"
+            ],
+            "matchFileNames": [
+                "images/image-buildah/flake.nix"
+            ],
+            "matchPackageNames": [
+                "https://github.com/NixOS/nixpkgs"
+            ],
+            "postUpgradeTasks": {
+                "commands": [
+                    "nix --extra-experimental-features 'nix-command flakes' flake update nixpkgs"
+                ],
+                "workingDirTemplate": "{{{packageFileDir}}}",
+                "fileFilters": [
+                    "images/image-buildah/flake.lock"
+                ],
+                "executionMode": "update",
+                "installTools": {
+                    "nix": {}
+                }
+            }
+        },
+        {
+            "description": "Compare SearxNG release dates while ignoring the commit hash",
             "matchDatasources": [
                 "docker"
             ],
             "matchPackageNames": [
-                "harbor.okwilkins.dev/ghcr-cache/**"
+                "index.docker.io/searxng/searxng"
             ],
-            "registryUrls": [
-                "https://ghcr.io"
+            "versioning": "regex:^(?<major>\\d{4})\\.(?<minor>\\d{1,2})\\.(?<patch>\\d{1,2})-[a-f0-9]+$",
+            "minimumReleaseAge": "7 days"
+        },
+        {
+            "description": "Group native updates to the shared bootstrap providers and lock file",
+            "matchManagers": [
+                "terraform"
             ],
-            "overrideDepName": "{{replace 'harbor\\.okwilkins\\.dev/ghcr-cache/' '' depName}}",
-            "enabled": true
+            "matchDatasources": [
+                "terraform-provider"
+            ],
+            "matchFileNames": [
+                "infrastructure/shared/providers.tf"
+            ],
+            "groupName": "bootstrap Terraform providers",
+            "groupSlug": "bootstrap-terraform-providers",
+            "separateMajorMinor": false
         }
     ]
 }

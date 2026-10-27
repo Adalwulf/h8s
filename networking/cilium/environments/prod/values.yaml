@@ -1,4 +1,4 @@
-# https://artifacthub.io/packages/helm/cilium/cilium/1.17.2?modal=values 
+# https://artifacthub.io/packages/helm/cilium/cilium/1.20.0?modal=values
 
 # -- (string) Kubernetes service host - use "auto" for automatic lookup from the cluster-info ConfigMap
 k8sServiceHost: localhost
@@ -13,6 +13,33 @@ ipam:
   # -- Configure IP Address Management mode.
   # ref: https://docs.cilium.io/en/stable/network/concepts/ipam/
   mode: kubernetes
+# Tunnel mode (VXLAN), no native routing
+# Worker nodes are cloud VMs reachable only over Tailscale (L3, no ARP), so
+# native routing with autoDirectNodeRoutes installs dead self-referential
+# routes on them and drops all pod traffic. VXLAN only needs node-to-node
+# connectivity: controlplanes tunnel over the LAN, workers over the tailnet.
+routingMode: tunnel
+# BPF masquerading: iptables-based masquerade cannot reverse-NAT replies that
+# arrive raw at tailscale0 for tunneled flows, silently breaking pod traffic
+# to node-IP backends (e.g. the API server). BPF masquerade keeps the conntrack
+# state in the datapath so replies reach their pod.
+bpf:
+  masquerade: true
+# Cluster pod CIDR, used as the no-masquerade range in tunnel mode: pod-to-pod
+# traffic keeps its source IP inside the tunnel, while node-IP destinations
+# (API server) are masqueraded. Without it everything is masqueraded and the
+# pod-to-pod reply path breaks.
+ipv4NativeRoutingCIDR: 10.244.0.0/16
+# Explicit MTU to prevent auto-detection from picking up tailscale0's MTU of 1280
+# 1450 = 1500 (ens18), 50 (VXLAN overhead)
+# Workers tunnel over the tailnet (1280), PMTU discovery below handles that
+MTU: 1450
+# PMTUD sends ICMP "fragmentation needed" to pods when a route's MTU
+# is smaller than the packet (e.g. cross-node via tailscale at 1280)
+# safe for LAN-only clusters, only triggers on MTU mismatch
+pmtuDiscovery:
+  enabled: true
+  packetizationLayerPMTUDMode: always
 # -- resources & limits for the agent init containers
 securityContext:
   capabilities:
@@ -101,10 +128,39 @@ cgroup:
     enabled: false
   # -- Configure cgroup root where cgroup2 filesystem is mounted on the host (see also: `cgroup.autoMount`)
   hostRoot: /sys/fs/cgroup
+
+dashboards:
+  enabled: true
+  namespace: monitoring
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
 hubble:
   relay:
     enabled: true
   ui:
     enabled: true
+  metrics:
+    enabled:
+      - dns:query;ignoreAAAA
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - http
+    serviceMonitor:
+      enabled: true
+    dashboards:
+      enabled: true
+      namespace: monitoring
+operator:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  dashboards:
+    enabled: true
+    namespace: monitoring
 hostFirewall:
   enabled: false

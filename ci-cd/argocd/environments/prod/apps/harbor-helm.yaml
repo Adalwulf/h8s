@@ -10,7 +10,7 @@ spec:
   sources:
     - repoURL: https://helm.goharbor.io
       chart: harbor
-      targetRevision: 1.18.3
+      targetRevision: 1.19.4
       helm:
         releaseName: harbor
         valueFiles:
@@ -24,6 +24,11 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: harbor
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
   syncPolicy:
     automated:
       prune: true

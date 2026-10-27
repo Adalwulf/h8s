@@ -1,6 +1,6 @@
 # H8s (Homernetes)
 
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.35-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io) [![Talos Linux](https://img.shields.io/badge/Talos-v1.12.0-00A3E0?style=for-the-badge&logo=linux&logoColor=white)](https://www.talos.dev) [![Cilium](https://img.shields.io/badge/Cilium-1.19.1-F8C517?style=for-the-badge&logo=cilium&logoColor=black)](https://cilium.io) [![ArgoCD](https://img.shields.io/badge/ArgoCD-9.4.7-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)](https://argoproj.github.io/cd) [![Nix Flakes](https://img.shields.io/badge/Nix-Flakes-5277C3?style=for-the-badge&logo=nixos&logoColor=white)](https://nixos.org) [![Stars](https://img.shields.io/github/stars/okwilkins/h8s?style=for-the-badge&logo=github&color=brightgreen)](https://github.com/okwilkins/h8s/stargazers)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.37-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white)](https://kubernetes.io) [![Talos Linux](https://img.shields.io/badge/Talos-v1.14.3-00A3E0?style=for-the-badge&logo=linux&logoColor=white)](https://www.talos.dev) [![Cilium](https://img.shields.io/badge/Cilium-1.20.4-F8C517?style=for-the-badge&logo=cilium&logoColor=black)](https://cilium.io) [![ArgoCD chart](https://img.shields.io/badge/ArgoCD_chart-10.11.6-EF7B4D?style=for-the-badge&logo=argo&logoColor=white)](https://argoproj.github.io/cd) [![Nix Flakes](https://img.shields.io/badge/Nix-Flakes-5277C3?style=for-the-badge&logo=nixos&logoColor=white)](https://nixos.org) [![Stars](https://img.shields.io/github/stars/okwilkins/h8s?style=for-the-badge&logo=github&color=brightgreen)](https://github.com/okwilkins/h8s/stargazers)
 
 H8s is a home infrastructure project that combines the power of Kubernetes with the security-first approach of Talos OS.
 This project provides a my setup, designed specifically for home labs and personal cloud environments.
@@ -18,12 +18,13 @@ Doing a homelab Kubernetes cluster has been a source of a lot of joy for me pers
 Most importantly: ***I find it fun!*** It keeps me excited and hungry at work and on my other personal projects.
 
 ## Features
-- Automated Bootstrap - 8-stage fully declaritive pipeline for complete cluster provisioning from bare metal in under 10 mins.
+- Automated Bootstrap: Fully declaritive pipeline for complete cluster provisioning from bare metal in under 10 mins.
 - Container registry.
 - Home-wide ad blocker and DNS.
 - Internal certificate authority.
 - Routing to private services only accessible at home.
 - Secrets management.
+- Kubernetes vulnerability and configuration scanning with Trivy Operator.
 - Metric and log observability.
 - Full CI/CD capabilities.
 - Internet access to services via Cloudflare. Give these a try:
@@ -37,7 +38,9 @@ Most importantly: ***I find it fun!*** It keeps me excited and hungry at work an
 
 ```text
 ├── applications
+│   ├── chhoto-url                  | Self-hosted URL shortener.
 │   ├── excalidraw                  | Self-hosted Excalidraw.
+│   ├── mazanoke                    | Browser-based image optimizer.
 │   └── searxng                     | Privacy-focused metasearch engine.
 ├── ci-cd
 │   ├── argo-workflows              | CI/CD pipelines (WIP).
@@ -45,9 +48,9 @@ Most importantly: ***I find it fun!*** It keeps me excited and hungry at work an
 │   └── renovate                    | Automated dependency updates.
 ├── images
 │   ├── coredns
-│   ├── terraform
-│   └── image-buildah
-├── infrastructure                  | Complete bootstrapping of the cluster with Proxmox and Talos + platform configuration.
+│   ├── image-buildah
+│   └── terraform
+├── infrastructure                  | 8-stage Terraform pipeline for cluster bootstrapping from bare metal via Proxmox and Talos + platform configuration.
 ├── namespaces                      | Holds all namespaces for the cluster.
 ├── networking
 │   ├── cert-manager                | Certificate controller for the self-hosted certificate authority.
@@ -56,16 +59,18 @@ Most importantly: ***I find it fun!*** It keeps me excited and hungry at work an
 │   ├── coredns                     | Home-wide DNS services and ad-blocking.
 │   └── gateways                    | Ingress and networking routing management.
 ├── observability
+│   ├── fluent-bit                  | Metrics/logs/traces collection, processing and forwarding.
 │   ├── grafana                     | Metrics and log observability.
-│   ├── loki                        | Log collection.
 │   ├── prometheus                  | Metrics collection.
-│   └── promtail                    | Log collection and shipping agent.
+│   └── victoria-logs               | Log storage and query engine.
 ├── security
+│   ├── authelia                    | Authentication and authorisation server with SSO and MFA.
 │   ├── cosign                      | Secrets to sign containers and binaries going to Harbor.
-│   ├── external-secrets-operator   | Takes secrets hosted internally with Vault and manages them inside the cluster.
+│   ├── external-secrets-operator   | Syncs secrets from Vault into the cluster.
+│   ├── trivy-operator              | Kubernetes vulnerability and configuration scanning.
 │   └── vault                       | Secrets storage and certificate authority.
 └── storage
-    ├── cloudnative-pg              | PostrgreSQL database management for various Applications.
+    ├── cloudnative-pg              | PostgreSQL database management for applications.
     ├── harbor                      | Container and binary registry.
     └── longhorn                    | Cluster CSI.
 ```

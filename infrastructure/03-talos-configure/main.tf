@@ -14,7 +14,7 @@ resource "terraform_data" "wait_for_nodes" {
 # Cluster Secrets
 # ============================================================
 # Generates the cluster PKI (CA certs, keys, tokens) once and persists them
-# in local state. This replaces the `talosctl gen secrets` call in gen_configs.sh.
+# in encrypted remote state. This replaces `talosctl gen secrets` in gen_configs.sh.
 #
 # WARNING: terraform.tfstate contains these secrets. Treat it like secret.yaml -
 # back it up to encrypted storage and never commit it to git.
@@ -36,6 +36,21 @@ locals {
     for name, node in var.nodes :
     name => regex("(\\d+)$", name)[0]
   }
+
+  tailscale_authkeys = {
+    for name, node in var.nodes :
+    name => trimspace(try(node.tailscale_authkey, ""))
+  }
+
+  tailscale_routes = {
+    for name, node in var.nodes :
+    name => try(node.tailscale_routes, [])
+  }
+
+  tailscale_exit_nodes = {
+    for name, node in var.nodes :
+    name => try(node.tailscale_exit_node, false)
+  }
 }
 
 data "talos_machine_configuration" "nodes" {
@@ -48,7 +63,7 @@ data "talos_machine_configuration" "nodes" {
   talos_version      = var.talos_version
   kubernetes_version = null # use the version bundled with talos_version
 
-  config_patches = [
+  config_patches = concat([
     # Hostname per node
     yamlencode({
       apiVersion = "v1alpha1"
@@ -89,7 +104,14 @@ data "talos_machine_configuration" "nodes" {
             port    = 7445
           }
         }
+        # IPv6 forwarding for the Tailscale exit node (IPv4 forwarding is on by default in Talos).
+        sysctls = {
+          "net.ipv6.conf.all.forwarding" = "1"
+        }
         kubelet = {
+          nodeIP = {
+            validSubnets = var.node_ip_valid_subnets
+          }
           extraMounts = [
             {
               destination = "/var/lib/longhorn"
@@ -116,13 +138,35 @@ data "talos_machine_configuration" "nodes" {
         }
         coreDNS = {
           disabled = false
+          image    = "docker.io/coredns/coredns:1.15.0@sha256:0a9d8c8ddf34347eb59aad9a8784f0710de88d6d112726d11d271f9bc6daca26"
         }
         controlPlane = {
           endpoint = "https://${var.talos_cluster_vip}:6443"
         }
       }
     }),
-  ]
+    ], lookup(local.tailscale_authkeys, each.key, "") != "" ? [
+    # Configure the optional Tailscale system extension when an auth key is supplied.
+    yamlencode({
+      apiVersion = "v1alpha1"
+      kind       = "ExtensionServiceConfig"
+      name       = "tailscale"
+      environment = concat([
+        "TS_AUTHKEY=${local.tailscale_authkeys[each.key]}",
+        "TS_HOSTNAME=${each.key}",
+        # TS_AUTH_ONCE=false: re-run `tailscale up` on every container start so
+        # changes to TS_ROUTES/TS_EXTRA_ARGS apply without re-provisioning.
+        # Requires a reusable Tailscale auth key (single-use keys would fail
+        # after the first login).
+        "TS_AUTH_ONCE=false",
+        "TS_ACCEPT_DNS=${lower(tostring(var.tailscale_accept_dns))}",
+        ], length(local.tailscale_routes[each.key]) > 0 ? [
+        "TS_ROUTES=${join(",", local.tailscale_routes[each.key])}",
+        ] : [], local.tailscale_exit_nodes[each.key] ? [
+        "TS_EXTRA_ARGS=--advertise-exit-node",
+      ] : [])
+    })
+  ] : [])
 }
 
 # ============================================================
@@ -147,11 +191,14 @@ resource "talos_machine_configuration_apply" "nodes" {
   node     = each.value.ip_address
   endpoint = each.value.ip_address
 
-  # On destroy, reset the node to maintenance mode so it can be re-bootstrapped
+  # `reset = false`: the provider's destroy is a no-op unless reset is set,
+  # and resetting a node wipes its ephemeral partition (taking any
+  # node-local data with it).  Destroying this resource must never touch
+  # the node itself.
   on_destroy = {
     graceful = true
-    reset    = true
-    reboot   = true
+    reset    = false
+    reboot   = false
   }
 
   depends_on = [terraform_data.wait_for_nodes]

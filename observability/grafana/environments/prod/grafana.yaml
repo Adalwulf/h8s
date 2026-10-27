@@ -5,7 +5,19 @@ metadata:
   labels:
     dashboards: grafana
 spec:
+  version: 13.3.0
+  persistentVolumeClaim:
+    spec:
+      storageClassName: longhorn
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
   config:
+    plugins:
+      # Failed updates unload bundled plugins on the read-only filesystem.
+      preinstall_auto_update: "false"
     server:
       domain: "grafana.okwilkins.dev"
       root_url: "https://%(domain)s/"
@@ -23,12 +35,32 @@ spec:
       role_attribute_path: contains(groups[*], 'admins') && 'Admin' || 'Viewer'
       allow_sign_up: "true"
       use_pkce: "true"
+      tls_client_ca: /etc/grafana/vault-ca.crt
   deployment:
     spec:
+      strategy:
+        type: Recreate
       template:
         spec:
+          securityContext:
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+          volumes:
+            - name: grafana-data
+              persistentVolumeClaim:
+                claimName: grafana-pvc
+            - name: vault-ca
+              secret:
+                secretName: grafana-okwilkins-dev-tls
+                items:
+                  - key: ca.crt
+                    path: ca.crt
           containers:
             - name: grafana
+              volumeMounts:
+                - name: vault-ca
+                  mountPath: /etc/grafana/vault-ca.crt
+                  subPath: ca.crt
               env:
                 - name: GF_SECURITY_ADMIN_USER
                   valueFrom:
